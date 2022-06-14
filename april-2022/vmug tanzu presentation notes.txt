@@ -1,0 +1,104 @@
+
+
+Why we chose Tanzu (slide 2):
+- We had a POC's for VMware Tanzu Advanced and RedHat Openshift
+	- worked with vendors to deploy both platforms
+		- used same devs to deploy apps to both
+		- used weighted scoring sheet to rate aspects of both platforms
+	- we felt the Tanzu platform was more polished
+		- tanzu release is more of a platform instead of individual components
+		- Openshift seemed to need more care and feeding because of the lack of a standard deployment
+	- Tanzu pricing was better
+
+
+
+What we deployed (slide 3):
+- Built Minimal Viable Platform (MVP) and onboarded a couple of dev teams
+	- started off with small single small environment
+		- dedicated vcenter, 3 esxi hosts with vvols storage on Pure
+	- configured AD federation to vmware cloud portal
+		- use AD groups to grant rbac perms in TMC
+			- TMC (Tanzu Mission Control) is used to 
+				- grant perms to k8s clusters
+				- apply OPA policies
+				- gives visiability to cluster resources
+	- At the time of deployment – features that we were looking at were not in TKGS yet so we deployed TKGM
+		- using AVI for k8s cluster load balancing and ingress for harbor/argocd
+		- Management cluster
+		- Shared Service cluster
+			- Shared Harbor registry
+				- we setup tanzu application catalog (TAC) to proxy cache to harbor
+					- means that you can deploy any tac images from harbor
+			- Shared Argo CD instance
+				- argo automates the deployment of desired application states and manages config 
+				  drift using code repo as the source of truth
+		- Tanzu Build Services TBS Cluster
+			- uses the open source Cloud Native Buildpacks project to turn application src code into container 
+			  images and keeps the images up to date automatically
+- Regional deployments match above (esxi infrastructure size varies)
+	- replicate harbor registry's to provide redundancy
+- Added sandbox environment 
+	- operations team training 
+	- upgrade testing
+	- new config testing
+
+
+
+How to keep dev teams from blowing it up (slide 4):
+- Use TMC to grant permissions and apply OPA (Open Policy Engine) Policies
+	- create cluster groups to apply same perms/policy to multiple clusters at once
+	- create workspace (grouping of namespaces) to apply perms/policies to groups of namespaces
+	- grant "view only" to k8s clusters
+		- allows platform team to manage cluster and keeps devs from installing/configuring unwanted things
+	- grant "admin" to dev teams at namespace level
+	- apply policys that
+		- limit container deployment to local harbor
+		- block creation of loadbalancer services
+		- block creation of nodeport services
+		- block certain type of persistent volume (pv) creation
+
+
+
+self-service (slide 5):
+- Dev teams can create clusters and manage namespaces
+	- Onboarding form – main need is AD group to be added to VMware cloud portal federation
+		- Grant access to TMC
+		- Send link to self service documentation
+			- Clone automation repo locally
+				- giving dev team access to our scripts, encourage input, submit pull request for improvements, etc
+				- where detailed docs for cluster build and namespace managment are located
+			- Run “New Cluster” script
+				- Provide product code, AD group (same as above), location and environment
+				- Provide repo maintained by dev team for namespace management
+				- Creates cluster config file and adds repo and cluster info to namespace pipeline config file
+				- Add, Commit cluster config file and namespace pipeline config file
+			- Create pull request that must be approved by platform team
+				- Control number of clusters created
+			- Pull request approved, cluster build script kicked off by ADO pipeline (this is gate to controll number of clusters created)
+				- 10-15 minutes cluster creation
+				- Added to tmc
+				- Opa policies applied to cluster group
+				- AD group granted cluster view role
+			- Once cluster build is complete
+				- Update yaml namespaces config file in dev team repo
+					- Add, Commit and push
+					- 15-30 second run time
+					- No gating, adds/deletes namespaces based on list in config file
+					- Creates Argo CD project, adds namespaces with admin perms, rbac based on AD group
+					- AD group granted Admin role on each namespace via workspaces
+	- Time to build cluster/namespaces
+		- once AD group is added to federation a dev team can spin up a cluster with custom namespaces in 15-20 minutes with this automation
+
+
+
+What we’ve learned so far (slide 6)
+- Shell scripting knowledge very helpful
+	- easiest way to manage is from *nix cmd line
+		- wsl works great
+- Git repo management knowledge is very helpful ( in our specific case because of our automation)
+- k8s docs are not always current
+	- VMware docs are no exception
+		- work with SE on workarounds ALL OF THE TIME
+- Learn to be flexible on your approach
+	- you will encounter bugs
+		- what you do with them determines success or failure
